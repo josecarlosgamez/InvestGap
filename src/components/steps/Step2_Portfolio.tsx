@@ -44,8 +44,24 @@ export function Step2Portfolio({ portfolio, onAddFund, onRemoveFund, onUpdateWei
 
       setIsSearchingYahoo(true);
       console.log('Searching Yahoo for:', search);
-      const results = await searchYahooFunds(search);
+      
+      let results: YahooSearchResult[] = [];
+      
+      results = await searchYahooFunds(search);
       console.log('Yahoo results:', results);
+      
+      if (search.startsWith('0P') && results.length === 0) {
+        console.log('Trying direct ticker lookup for:', search);
+        results = [{
+          symbol: search.toUpperCase(),
+          name: search.toUpperCase(),
+          type: 'MUTUALFUND',
+          exchange: 'SPAIN',
+          assetType: 'index_fund',
+        }];
+        console.log('Direct lookup result:', results);
+      }
+      
       setYahooSearchResults(results);
       setIsSearchingYahoo(false);
     };
