@@ -43,10 +43,9 @@ export function Step2Portfolio({ portfolio, onAddFund, onRemoveFund, onUpdateWei
       }
 
       setIsSearchingYahoo(true);
-      console.log('Searching Yahoo for:', search);
       
       const results = await searchYahooFunds(search);
-      console.log('Yahoo results:', results);
+      console.log('Yahoo search results:', results);
       
       setYahooSearchResults(results);
       setIsSearchingYahoo(false);

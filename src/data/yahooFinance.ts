@@ -125,16 +125,13 @@ export async function searchYahooFunds(query: string): Promise<YahooSearchResult
             q.quoteType === 'EQUITY'
           )
           .slice(0, 10)
-          .map((q: any) => {
-            console.log('Raw Yahoo result:', q);
-            return {
+          .map((q: any) => ({
               symbol: q.symbol,
-              name: q.shortname || q.longname || q.longName || q.shortName || q.symbol,
+              name: q.longname || q.longName || q.shortname || q.shortName || q.symbol,
               type: q.quoteType,
               exchange: q.exchange || '',
               assetType: getAssetType(q.quoteType),
-            };
-          });
+            }));
         
         console.log('Yahoo search:', query, '→', results.length, 'results via', proxy);
         return results;
