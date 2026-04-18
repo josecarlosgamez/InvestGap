@@ -89,14 +89,18 @@ export interface YahooSearchResult {
 export async function searchYahooFunds(query: string): Promise<YahooSearchResult[]> {
   if (!query || query.length < 1) return [];
   
+  const CORS_PROXY = 'https://corsproxy.io/?';
+  
   try {
-    const encodedQuery = encodeURIComponent(query);
-    const response = await fetch(
-      `https://query1.finance.yahoo.com/v1/finance/search?q=${encodedQuery}&quotesCount=12&newsCount=0&enableFuzzyQuery=false`
-    );
+    const targetUrl = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(query)}&quotesCount=15&enableFuzzyQuery=true`;
+    const response = await fetch(CORS_PROXY + encodeURIComponent(targetUrl), {
+      headers: {
+        'Accept': 'application/json',
+      },
+    });
     
     if (!response.ok) {
-      console.error('Yahoo search HTTP error:', response.status);
+      console.warn('Yahoo search error:', response.status);
       return [];
     }
     
@@ -111,7 +115,7 @@ export async function searchYahooFunds(query: string): Promise<YahooSearchResult
           q.quoteType === 'MUTUALFUND' ||
           q.quoteType === 'EQUITY'
         )
-        .slice(0, 8)
+        .slice(0, 10)
         .map((q: any) => ({
           symbol: q.symbol,
           name: q.shortname || q.longname || q.symbol,
@@ -120,13 +124,13 @@ export async function searchYahooFunds(query: string): Promise<YahooSearchResult
           assetType: getAssetType(q.quoteType),
         }));
       
-      console.log('Yahoo search results for:', query, results);
+      console.log('Yahoo search:', query, '→', results.length, 'results');
       return results;
     }
     
     return [];
   } catch (error) {
-    console.error('Yahoo search error:', error);
+    console.warn('Yahoo search failed:', error);
     return [];
   }
 }
