@@ -89,50 +89,59 @@ export interface YahooSearchResult {
 export async function searchYahooFunds(query: string): Promise<YahooSearchResult[]> {
   if (!query || query.length < 1) return [];
   
-  const CORS_PROXY = 'https://corsproxy.io/?';
+  const CORS_PROXIES = [
+    'https://corsproxy.io/?',
+    'https://api.allorigins.win/raw?url=',
+  ];
   
-  try {
-    const targetUrl = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(query)}&quotesCount=15&enableFuzzyQuery=true`;
-    const response = await fetch(CORS_PROXY + encodeURIComponent(targetUrl), {
-      headers: {
-        'Accept': 'application/json',
-      },
-    });
-    
-    if (!response.ok) {
-      console.warn('Yahoo search error:', response.status);
-      return [];
-    }
-    
-    const data = await response.json();
-    
-    if (data?.quotes) {
-      const results = data.quotes
-        .filter((q: any) => 
-          q.quoteType === 'ETF' || 
-          q.quoteType === 'MUTETF' || 
-          q.quoteType === 'MUT FUND' || 
-          q.quoteType === 'MUTUALFUND' ||
-          q.quoteType === 'EQUITY'
-        )
-        .slice(0, 10)
-        .map((q: any) => ({
-          symbol: q.symbol,
-          name: q.shortname || q.longname || q.symbol,
-          type: q.quoteType,
-          exchange: q.exchange || '',
-          assetType: getAssetType(q.quoteType),
-        }));
+  for (const proxy of CORS_PROXIES) {
+    try {
+      const targetUrl = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(query)}&quotesCount=20&enableFuzzyQuery=true`;
+      const response = await fetch(proxy + encodeURIComponent(targetUrl), {
+        headers: { 'Accept': 'application/json' },
+      });
       
-      console.log('Yahoo search:', query, '→', results.length, 'results');
-      return results;
+      if (!response.ok) {
+        console.warn(`Proxy ${proxy} failed:`, response.status);
+        continue;
+      }
+      
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        console.warn('Failed to parse JSON:', text.substring(0, 200));
+        continue;
+      }
+      
+      if (data?.quotes) {
+        const results = data.quotes
+          .filter((q: any) => 
+            q.quoteType === 'ETF' || 
+            q.quoteType === 'MUTETF' || 
+            q.quoteType === 'MUT FUND' || 
+            q.quoteType === 'MUTUALFUND' ||
+            q.quoteType === 'EQUITY'
+          )
+          .slice(0, 10)
+          .map((q: any) => ({
+            symbol: q.symbol,
+            name: q.shortname || q.longname || q.symbol,
+            type: q.quoteType,
+            exchange: q.exchange || '',
+            assetType: getAssetType(q.quoteType),
+          }));
+        
+        console.log('Yahoo search:', query, '→', results.length, 'results via', proxy);
+        return results;
+      }
+    } catch (error) {
+      console.warn('Search attempt failed:', error);
     }
-    
-    return [];
-  } catch (error) {
-    console.warn('Yahoo search failed:', error);
-    return [];
   }
+  
+  return [];
 }
 
 function getAssetType(quoteType: string): string {
