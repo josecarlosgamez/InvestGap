@@ -20,7 +20,7 @@ export interface YahooFundData {
   topHoldings: { name: string; weight: number }[];
 }
 
-const YAHOO_TICKER_MAP: Record<string, string> = {
+export const YAHOO_TICKER_MAP: Record<string, string> = {
   'VWRL': 'VWRL.AS',
   'IWDA': 'IWDA.AS',
   'CW8': 'CW8.PA',

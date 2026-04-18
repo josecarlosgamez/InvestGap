@@ -8,7 +8,7 @@ import { Step4GapsAndSuggestions } from './components/steps/Step4_GapsAndSuggest
 
 function App() {
   const { t } = useTranslation();
-  const { state, setQuestionnaire, addFundToPortfolio, removeFromPortfolio, updateWeight, analyzePortfolio, setStep } = useAppState();
+  const { state, isLoadingLive, setQuestionnaire, addFundToPortfolio, removeFromPortfolio, updateWeight, analyzePortfolio, setStep, refreshLiveData } = useAppState();
   const isES = i18n.language === 'es';
 
   const toggleLanguage = () => {
@@ -125,6 +125,8 @@ function App() {
               aggregated={state.aggregated}
               stressResults={state.stressResults}
               riskProfile={state.riskProfile || ''}
+              isLoadingLive={isLoadingLive}
+              onRefreshLive={refreshLiveData}
             />
             {state.gaps.length > 0 && (
               <div className="p-4">
