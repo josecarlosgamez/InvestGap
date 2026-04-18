@@ -37,18 +37,20 @@ export function Step2Portfolio({ portfolio, onAddFund, onRemoveFund, onUpdateWei
 
   useEffect(() => {
     const searchYahoo = async () => {
-      if (search.length < 2) {
+      if (search.length < 1) {
         setYahooSearchResults([]);
         return;
       }
 
       setIsSearchingYahoo(true);
+      console.log('Searching Yahoo for:', search);
       const results = await searchYahooFunds(search);
+      console.log('Yahoo results:', results);
       setYahooSearchResults(results);
       setIsSearchingYahoo(false);
     };
 
-    const debounce = setTimeout(searchYahoo, 500);
+    const debounce = setTimeout(searchYahoo, 300);
     return () => clearTimeout(debounce);
   }, [search]);
 

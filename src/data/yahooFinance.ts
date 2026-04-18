@@ -90,18 +90,20 @@ export async function searchYahooFunds(query: string): Promise<YahooSearchResult
   if (!query || query.length < 1) return [];
   
   try {
+    const encodedQuery = encodeURIComponent(query);
     const response = await fetch(
-      `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(query)}&quotesCount=10&newsCount=0&enableFuzzyQuery=false&quotesQueryId=00000000-00000000-00000000-00000000-00000000-00000000-00000000-00000000-00000000-00000000`
+      `https://query1.finance.yahoo.com/v1/finance/search?q=${encodedQuery}&quotesCount=12&newsCount=0&enableFuzzyQuery=false`
     );
     
     if (!response.ok) {
-      throw new Error(`HTTP error: ${response.status}`);
+      console.error('Yahoo search HTTP error:', response.status);
+      return [];
     }
     
     const data = await response.json();
     
     if (data?.quotes) {
-      return data.quotes
+      const results = data.quotes
         .filter((q: any) => 
           q.quoteType === 'ETF' || 
           q.quoteType === 'MUTETF' || 
@@ -117,6 +119,9 @@ export async function searchYahooFunds(query: string): Promise<YahooSearchResult
           exchange: q.exchange || '',
           assetType: getAssetType(q.quoteType),
         }));
+      
+      console.log('Yahoo search results for:', query, results);
+      return results;
     }
     
     return [];
