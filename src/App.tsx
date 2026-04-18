@@ -24,39 +24,58 @@ function App() {
     { num: 4, key: 'suggestions', label: t('steps.suggestions') },
   ];
 
+  const progressPercent = ((state.currentStep - 1) / (steps.length - 1)) * 100;
+
   return (
     <div className="min-h-screen bg-bg">
+      {/* Background Pattern */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-accent/5 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-accent-secondary/5 rounded-full blur-3xl" />
+      </div>
+
       {/* Header */}
-      <header className="bg-surface border-b border-border p-4">
-        <div className="max-w-xl mx-auto flex items-center justify-between">
-          <div>
-            <h1 className="text-xl text-text font-bold">{t('app.title')}</h1>
-            <p className="text-text-muted text-sm">{t('app.tagline')}</p>
+      <header className="relative glass-card border-x-0 border-t-0 rounded-none">
+        <div className="max-w-xl mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent to-accent-secondary flex items-center justify-center">
+              <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-lg text-text font-bold">{t('app.title')}</h1>
+              <p className="text-xs text-text-secondary">{t('app.tagline')}</p>
+            </div>
           </div>
           <button
             onClick={toggleLanguage}
-            className="px-3 py-1 border border-border rounded text-text text-sm"
+            className="px-4 py-2 glass-card rounded-lg text-sm font-medium text-text hover:text-accent transition-colors"
           >
             {isES ? '🇪🇸 ES' : '🇬🇧 EN'}
           </button>
         </div>
       </header>
 
-      {/* Progress */}
-      <div className="max-w-xl mx-auto p-4">
-        <div className="flex gap-1">
-          {steps.map(s => (
-            <div
-              key={s.num}
-              className={`flex-1 h-1 rounded ${state.currentStep >= s.num ? 'bg-accent' : 'bg-surface-raised'}`}
-            />
-          ))}
+      {/* Progress Bar */}
+      <div className="max-w-xl mx-auto px-4 py-4">
+        <div className="relative h-1 bg-surface-raised rounded-full overflow-hidden">
+          <div 
+            className="absolute h-full bg-gradient-to-r from-accent to-accent-secondary rounded-full transition-all duration-500"
+            style={{ width: `${progressPercent}%` }}
+          />
         </div>
         <div className="flex justify-between mt-2">
           {steps.map(s => (
             <span
               key={s.num}
-              className={`text-xs ${state.currentStep === s.num ? 'text-accent' : 'text-text-muted'}`}
+              className={`text-xs transition-colors ${
+                state.currentStep === s.num 
+                  ? 'text-accent font-medium' 
+                  : state.currentStep > s.num 
+                    ? 'text-accent-green' 
+                    : 'text-text-muted'
+              }`}
             >
               {s.label}
             </span>
@@ -65,25 +84,25 @@ function App() {
       </div>
 
       {/* Main Content */}
-      <main className="max-w-xl mx-auto pb-8">
+      <main className="relative max-w-xl mx-auto pb-8 px-4">
         {state.currentStep === 1 && !state.riskProfile && (
           <Step1Questionnaire onComplete={setQuestionnaire} />
         )}
 
         {state.currentStep === 1 && state.riskProfile && (
-          <div className="p-4">
-            <div className="bg-surface border border-border rounded-lg p-6 text-center mb-6">
-              <p className="text-text-muted mb-2">Tu perfil de inversionista:</p>
-              <h2 className="text-3xl text-accent font-bold mb-2">
+          <div className="animate-fade-in">
+            <div className="glass-card p-6 text-center mb-6">
+              <div className="text-text-secondary mb-2">Tu perfil de inversor</div>
+              <h2 className="text-3xl gradient-text font-bold mb-2">
                 {t(`profiles.${state.riskProfile}`)}
               </h2>
-              <p className="text-text-muted text-sm">
+              <p className="text-text-secondary text-sm">
                 {t(`profiles.${state.riskProfile}_desc`)}
               </p>
             </div>
             <button
               onClick={() => setStep(2)}
-              className="w-full py-3 bg-accent text-white rounded-lg"
+              className="w-full py-4 btn-primary"
             >
               {t('common.next')}
             </button>
@@ -111,7 +130,7 @@ function App() {
               <div className="p-4">
                 <button
                   onClick={() => setStep(4)}
-                  className="w-full py-3 bg-accent text-white rounded-lg"
+                  className="w-full py-4 btn-primary"
                 >
                   {t('common.next')}
                 </button>

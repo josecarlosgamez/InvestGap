@@ -1,103 +1,102 @@
 import type { Fund, PortfolioPosition, StressTestResult, CrisisKey } from '../types';
 import { CRISIS_SCENARIOS } from '../data/crises';
-import { type ProxyKey, getProxyDrawdown } from '../data/proxies';
+import { RISK_FACTOR_MATRIX, type RiskFactorKey, getRiskFactorDrawdown } from '../data/riskFactors';
 
-interface ProxyWeights {
-  US_LARGE_CAP: number;
-  US_TECH_GROWTH: number;
-  EUROPE_EQUITY: number;
-  EM_EQUITY: number;
-  GLOBAL_AGG_BOND: number;
-  LONG_TREASURY: number;
-  HIGH_YIELD_BOND: number;
-  GOLD: number;
-  COMMODITIES: number;
-  REAL_ESTATE: number;
-}
+export type FactorExposures = Record<RiskFactorKey, number>;
 
-export function calculateProxyCorrelations(fund: Fund): ProxyWeights {
-  const weights: ProxyWeights = {
-    US_LARGE_CAP: 0,
-    US_TECH_GROWTH: 0,
-    EUROPE_EQUITY: 0,
-    EM_EQUITY: 0,
-    GLOBAL_AGG_BOND: 0,
-    LONG_TREASURY: 0,
-    HIGH_YIELD_BOND: 0,
-    GOLD: 0,
-    COMMODITIES: 0,
-    REAL_ESTATE: 0,
+export function calculateFactorExposures(fund: Fund): FactorExposures {
+  const exposures: FactorExposures = {
+    EQUITY_US_CORE: 0, EQUITY_US_GROWTH: 0, EQUITY_US_SMALLCAP: 0, EQUITY_EUROPE: 0, EQUITY_EM: 0,
+    FIXED_INCOME_AGG: 0, FIXED_INCOME_LONG: 0, FIXED_INCOME_HY: 0,
+    REAL_ASSETS_REITS: 0, REAL_ASSETS_GOLD: 0, REAL_ASSETS_COMMOD: 0
   };
 
-  const equityPct = fund.assetBreakdown.equity / 100;
-  const fixedIncomePct = fund.assetBreakdown.fixedIncome / 100;
-  const realEstatePct = fund.assetBreakdown.realEstate / 100;
-  const goldPct = fund.assetBreakdown.gold / 100;
-  const commodityPct = fund.assetBreakdown.commodity / 100;
+  const { equity, fixedIncome, realEstate, gold, commodity, cash } = fund.assetBreakdown;
+  const netEquity = equity / 100;
+  const netFixedIncome = fixedIncome / 100;
+  const netRealEstate = realEstate / 100;
+  const netGold = gold / 100;
+  const netCommod = commodity / 100;
+  const cashPct = cash / 100;
 
-  if (equityPct > 0) {
+  if (netEquity > 0) {
     const geo = fund.geoExposure;
     const totalGeo = (geo.us || 0) + (geo.europe || 0) + (geo.japan || 0) + (geo.emerging_markets || 0) + (geo.global || 0) + (geo.asia_pacific_ex_japan || 0) + (geo.spain || 0) + (geo.eurozone || 0);
     
-    if (totalGeo === 0) {
-      weights.US_LARGE_CAP += equityPct * 0.5;
-      weights.EUROPE_EQUITY += equityPct * 0.25;
-      weights.EM_EQUITY += equityPct * 0.25;
+    let usWeight = 0, euWeight = 0, emWeight = 0;
+    
+    if (totalGeo > 0) {
+      usWeight = (geo.us || 0) / totalGeo;
+      euWeight = (geo.europe || 0) / totalGeo;
+      emWeight = (geo.emerging_markets || 0) / totalGeo;
+      const jpWeight = (geo.japan || 0) / totalGeo;
+      usWeight += jpWeight * 0.4;
+      euWeight += jpWeight * 0.6;
     } else {
-      const usGeoPct = (geo.us || 0) / totalGeo;
-      const europeGeoPct = (geo.europe || 0) / totalGeo;
-      const emGeoPct = (geo.emerging_markets || 0) / totalGeo;
-      const japanGeoPct = (geo.japan || 0) / totalGeo;
-
-      const usWeight = usGeoPct + japanGeoPct * 0.5;
-      const europeWeight = europeGeoPct + japanGeoPct * 0.5;
-
-      const techPct = (fund.sectorExposure.technology || 0) / 100;
-      const usEquityAlloc = equityPct * usWeight;
-      const techShift = techPct * usEquityAlloc;
-      const usLargeCapRemainder = usEquityAlloc - techShift;
-
-      weights.US_TECH_GROWTH += techShift;
-      weights.US_LARGE_CAP += usLargeCapRemainder;
-      weights.EUROPE_EQUITY += equityPct * europeWeight;
-      weights.EM_EQUITY += equityPct * emGeoPct;
+      usWeight = 0.5;
+      euWeight = 0.25;
+      emWeight = 0.25;
     }
+
+    const isSmallCap = fund.equityStyle === 'small_cap';
+    const techPct = (fund.sectorExposure.technology || 0) / 100;
+    const usEquityAlloc = netEquity * usWeight;
+    const euEquityAlloc = netEquity * euWeight;
+    const emEquityAlloc = netEquity * emWeight;
+
+    if (isSmallCap) {
+      exposures.EQUITY_US_SMALLCAP += usEquityAlloc;
+      exposures.EQUITY_US_CORE += usEquityAlloc * 0.2;
+    } else if (techPct > 0.35) {
+      const growthLoading = techPct;
+      exposures.EQUITY_US_GROWTH += usEquityAlloc * growthLoading;
+      exposures.EQUITY_US_CORE += usEquityAlloc * (1 - growthLoading);
+    } else {
+      exposures.EQUITY_US_CORE += usEquityAlloc;
+    }
+
+    exposures.EQUITY_EUROPE += euEquityAlloc;
+    exposures.EQUITY_EM += emEquityAlloc;
   }
 
-  if (fixedIncomePct > 0) {
+  if (netFixedIncome > 0) {
     if (fund.bondType === 'corporate_hy') {
-      weights.HIGH_YIELD_BOND = fixedIncomePct;
-    } else if ((fund.avgDurationYears || 0) >= 10) {
-      weights.LONG_TREASURY = fixedIncomePct;
+      exposures.FIXED_INCOME_HY += netFixedIncome;
     } else {
-      weights.GLOBAL_AGG_BOND = fixedIncomePct;
+      const duration = fund.avgDurationYears || 0;
+      if (duration >= 10) {
+        const intensity = Math.min(duration / 25, 1);
+        exposures.FIXED_INCOME_LONG += netFixedIncome * intensity;
+        exposures.FIXED_INCOME_AGG += netFixedIncome * (1 - intensity);
+      } else {
+        exposures.FIXED_INCOME_AGG += netFixedIncome;
+      }
     }
   }
 
-  weights.REAL_ESTATE += realEstatePct;
-  weights.GOLD += goldPct;
-  weights.COMMODITIES += commodityPct;
+  exposures.REAL_ASSETS_REITS += netRealEstate;
+  exposures.REAL_ASSETS_GOLD += netGold;
+  exposures.REAL_ASSETS_COMMOD += netCommod;
 
-  const cashPct = fund.assetBreakdown.cash / 100;
   const totalRiskAssets = 1 - cashPct;
-
   if (totalRiskAssets > 0 && totalRiskAssets < 1) {
-    for (const key of Object.keys(weights) as ProxyKey[]) {
-      weights[key] = weights[key] / totalRiskAssets;
+    const scale = 1 / totalRiskAssets;
+    for (const key of Object.keys(exposures) as RiskFactorKey[]) {
+      exposures[key] *= scale;
     }
   }
 
-  return weights;
+  return exposures;
 }
 
 export function calculateFundDrawdown(fund: Fund, crisisKey: CrisisKey): number {
-  const proxies = calculateProxyCorrelations(fund);
+  const exposures = calculateFactorExposures(fund);
   let totalDrawdown = 0;
 
-  for (const [proxyKey, weight] of Object.entries(proxies)) {
-    if (weight > 0) {
-      const drawdown = getProxyDrawdown(proxyKey as ProxyKey, crisisKey);
-      totalDrawdown += weight * drawdown;
+  for (const [key, loading] of Object.entries(exposures)) {
+    if (loading > 0) {
+      const drawdown = getRiskFactorDrawdown(key as RiskFactorKey, crisisKey);
+      totalDrawdown += loading * drawdown;
     }
   }
 

@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { AggregatedPortfolio, StressTestResult } from '../../types';
+import { DonutChart } from '../charts/DonutChart';
+import { BarChart, HorizontalBar } from '../charts/BarChart';
 
 interface Props {
   aggregated: AggregatedPortfolio;
@@ -14,32 +16,97 @@ export function Step3Analysis({ aggregated, stressResults, riskProfile }: Props)
   const isES = i18n.language === 'es';
 
   const assetColors: Record<string, string> = {
-    equity: '#4f8ef7',
-    fixedIncome: '#36d399',
-    realEstate: '#fbbf24',
-    commodity: '#f472b6',
-    gold: '#fbbf24',
-    cash: '#8892a4',
+    equity: '#0052FF',
+    fixedIncome: '#00D68F',
+    realEstate: '#F79E1B',
+    commodity: '#EB001B',
+    gold: '#F79E1B',
+    cash: '#6B7280',
   };
+
+  const assetData = Object.entries(aggregated.assetBreakdown)
+    .filter(([, val]) => val > 0)
+    .map(([key, val]) => ({
+      label: key === 'fixedIncome' ? 'Bonos' : key.charAt(0).toUpperCase() + key.slice(1),
+      value: val,
+      color: assetColors[key] || '#6B7280',
+    }));
 
   const geoLabels: Record<string, string> = {
     us: 'EE.UU.', europe: 'Europa', japan: 'Japón', emerging_markets: 'Emergentes',
     asia_pacific_ex_japan: 'Asia Pac.', global: 'Global', spain: 'España', eurozone: 'Eurozona'
   };
 
+  const geoData = Object.entries(aggregated.geoExposure)
+    .filter(([, v]) => v > 0)
+    .sort((a, b) => b[1] - a[1])
+    .map(([key, val]) => ({
+      label: geoLabels[key] || key,
+      value: val,
+    }));
+
+  const crisisData = stressResults
+    .filter(r => r.portfolioDrawdown !== 0)
+    .slice(0, 5)
+    .map(r => ({
+      label: isES ? r.crisis.nameES : r.crisis.nameEN,
+      value: r.portfolioDrawdown,
+    }));
+
+  const sortedByDrawdown = [...stressResults].sort((a, b) => a.portfolioDrawdown - b.portfolioDrawdown);
+  const worstCrisis = sortedByDrawdown[0];
+  const bestCrisis = sortedByDrawdown[sortedByDrawdown.length - 1];
+
   return (
     <div className="max-w-xl mx-auto p-4">
+      {/* Header Stats */}
+      <div className="flex gap-3 mb-6">
+        <div className="glass-card flex-1 p-4 text-center">
+          <div className="text-text-secondary text-xs mb-1">Peor Crisis</div>
+          <div className="text-xl font-bold text-accent-red font-mono">
+            {worstCrisis?.portfolioDrawdown !== undefined ? `${worstCrisis.portfolioDrawdown}%` : '—'}
+          </div>
+          <div className="text-xs text-text-muted truncate">
+            {isES ? worstCrisis?.crisis.nameES : worstCrisis?.crisis.nameEN}
+          </div>
+        </div>
+        <div className="glass-card flex-1 p-4 text-center">
+          <div className="text-text-secondary text-xs mb-1">Mejor Crisis</div>
+          <div className="text-xl font-bold text-accent-green font-mono">
+            {bestCrisis?.portfolioDrawdown !== undefined ? `${bestCrisis.portfolioDrawdown >= 0 ? '+' : ''}${bestCrisis.portfolioDrawdown}%` : '—'}
+          </div>
+          <div className="text-xs text-text-muted truncate">
+            {isES ? bestCrisis?.crisis.nameES : bestCrisis?.crisis.nameEN}
+          </div>
+        </div>
+        <div className="glass-card flex-1 p-4 text-center">
+          <div className="text-text-secondary text-xs mb-1">SRRI</div>
+          <div className="text-xl font-bold gradient-text font-mono">
+            {aggregated.weightedSRRI}<span className="text-sm text-text-muted">/7</span>
+          </div>
+          <div className="text-xs text-text-muted">Riesgo</div>
+        </div>
+      </div>
+
       {/* Tabs */}
-      <div className="flex gap-2 mb-4">
+      <div className="flex gap-2 mb-6">
         <button
           onClick={() => setTab('breakdown')}
-          className={`flex-1 py-2 rounded-lg ${tab === 'breakdown' ? 'bg-accent text-white' : 'bg-surface text-text'}`}
+          className={`flex-1 py-3 rounded-xl font-medium transition-all ${
+            tab === 'breakdown' 
+              ? 'bg-gradient-to-r from-accent to-accent-secondary text-white shadow-glow-blue' 
+              : 'glass-card text-text-secondary hover:text-text'
+          }`}
         >
           {t('analysis.breakdown')}
         </button>
         <button
           onClick={() => setTab('stresstest')}
-          className={`flex-1 py-2 rounded-lg ${tab === 'stresstest' ? 'bg-accent text-white' : 'bg-surface text-text'}`}
+          className={`flex-1 py-3 rounded-xl font-medium transition-all ${
+            tab === 'stresstest' 
+              ? 'bg-gradient-to-r from-accent to-accent-secondary text-white shadow-glow-blue' 
+              : 'glass-card text-text-secondary hover:text-text'
+          }`}
         >
           {t('analysis.stressTest')}
         </button>
@@ -47,63 +114,27 @@ export function Step3Analysis({ aggregated, stressResults, riskProfile }: Props)
 
       {tab === 'breakdown' && (
         <>
-          {/* Asset Class Breakdown */}
-          <div className="bg-surface border border-border rounded-lg p-4 mb-4">
-            <h3 className="text-text font-bold mb-3">{t('analysis.assetClass')}</h3>
-            <div className="space-y-2">
-              {Object.entries(aggregated.assetBreakdown).map(([key, val]) => (
-                val > 0 && (
-                  <div key={key} className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded" style={{ backgroundColor: assetColors[key] }} />
-                    <span className="text-text text-sm w-24 capitalize">{key}</span>
-                    <div className="flex-1 h-4 bg-surface-raised rounded overflow-hidden">
-                      <div className="h-full bg-accent" style={{ width: `${val}%` }} />
-                    </div>
-                    <span className="text-text-mono text-sm w-12 text-right">{val.toFixed(0)}%</span>
-                  </div>
-                )
-              ))}
-            </div>
+          {/* Asset Allocation - Donut Chart */}
+          <div className="glass-card p-6 mb-4">
+            <h3 className="text-text font-semibold mb-4">{t('analysis.assetClass')}</h3>
+            <DonutChart data={assetData} size={180} strokeWidth={28} />
           </div>
 
-          {/* Geography */}
-          <div className="bg-surface border border-border rounded-lg p-4 mb-4">
-            <h3 className="text-text font-bold mb-3">{t('analysis.geography')}</h3>
-            <div className="space-y-2">
-              {Object.entries(aggregated.geoExposure)
-                .filter(([, v]) => v > 0)
-                .sort((a, b) => b[1] - a[1])
-                .map(([key, val]) => (
-                  <div key={key} className="flex items-center gap-2">
-                    <span className="text-text text-sm w-20">{geoLabels[key] || key}</span>
-                    <div className="flex-1 h-4 bg-surface-raised rounded overflow-hidden">
-                      <div className="h-full bg-accent" style={{ width: `${val}%` }} />
-                    </div>
-                    <span className="text-text-mono text-sm w-10 text-right">{val.toFixed(0)}%</span>
-                  </div>
-                ))}
-            </div>
+          {/* Geographic Allocation */}
+          <div className="glass-card p-6 mb-4">
+            <h3 className="text-text font-semibold mb-4">{t('analysis.geography')}</h3>
+            <BarChart data={geoData} maxValue={100} />
           </div>
 
-          {/* Metrics */}
-          <div className="bg-surface border border-border rounded-lg p-4">
-            <h3 className="text-text font-bold mb-3">{t('analysis.metrics')}</h3>
+          {/* Key Metrics */}
+          <div className="glass-card p-6">
+            <h3 className="text-text font-semibold mb-4">{t('analysis.metrics')}</h3>
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <span className="text-text-muted text-sm">{t('analysis.srri')}</span>
-                <div className="text-2xl text-accent font-mono">{aggregated.weightedSRRI}/7</div>
-              </div>
-              <div>
-                <span className="text-text-muted text-sm">{t('analysis.ter')}</span>
-                <div className="text-2xl text-accent font-mono">{aggregated.weightedTER}%</div>
-              </div>
-              <div>
-                <span className="text-text-muted text-sm">{t('analysis.infProt')}</span>
-                <div className="text-text">{aggregated.hasInflationProtection ? '✓' : '✗'}</div>
-              </div>
-              <div>
-                <span className="text-text-muted text-sm">{t('analysis.currHedg')}</span>
-                <div className="text-text">{aggregated.hasCurrencyHedging ? '✓' : '✗'}</div>
+              <HorizontalBar label={t('analysis.infProt')} value={aggregated.hasInflationProtection ? 100 : 0} color="#00D68F" />
+              <HorizontalBar label={t('analysis.currHedg')} value={aggregated.hasCurrencyHedging ? 100 : 0} color="#00D68F" />
+              <div className="col-span-2 pt-2 border-t border-white/10">
+                <div className="text-text-secondary text-sm mb-1">{t('analysis.ter')}</div>
+                <div className="text-2xl gradient-text font-mono">{aggregated.weightedTER}%</div>
               </div>
             </div>
           </div>
@@ -112,24 +143,58 @@ export function Step3Analysis({ aggregated, stressResults, riskProfile }: Props)
 
       {tab === 'stresstest' && (
         <>
-          <p className="text-text-muted text-sm mb-4">{t('analysis.disclaimer')}</p>
+          <p className="text-text-secondary text-sm mb-4 opacity-70">{t('analysis.disclaimer')}</p>
+          
+          {/* Crisis Comparison Bar Chart */}
+          <div className="glass-card p-6 mb-4">
+            <h3 className="text-text font-semibold mb-4">Comparación de Crisis</h3>
+            <BarChart data={crisisData} maxValue={60} />
+          </div>
+
+          {/* Detailed Crisis Cards */}
           {stressResults.map(result => (
-            <div key={result.crisis.key} className="bg-surface border border-border rounded-lg p-4 mb-4">
+            <div key={result.crisis.key} className="glass-card p-4 mb-3">
               <div className="flex items-center justify-between mb-2">
-                <h3 className="text-text font-bold">{isES ? result.crisis.nameES : result.crisis.nameEN}</h3>
-                <span className="text-text-muted text-sm">{result.crisis.period}</span>
+                <h3 className="text-text font-semibold">
+                  {isES ? result.crisis.nameES : result.crisis.nameEN}
+                </h3>
+                <span className="text-text-muted text-xs">{result.crisis.period}</span>
               </div>
-              <p className="text-text-muted text-sm mb-3">{isES ? result.crisis.descriptionES : result.crisis.descriptionEN}</p>
-              <div className={`text-4xl font-mono mb-3 ${result.portfolioDrawdown < 0 ? 'text-accent-red' : 'text-accent-green'}`}>
-                {result.portfolioDrawdown > 0 ? '+' : ''}{result.portfolioDrawdown}%
+              <p className="text-text-secondary text-sm mb-3 opacity-70">
+                {isES ? result.crisis.descriptionES : result.crisis.descriptionEN}
+              </p>
+              
+              <div className="flex items-center gap-4 mb-3">
+                <div className={`text-3xl font-bold font-mono ${
+                  result.portfolioDrawdown < 0 ? 'text-accent-red' : 'text-accent-green'
+                }`}>
+                  {result.portfolioDrawdown >= 0 ? '+' : ''}{result.portfolioDrawdown}%
+                </div>
+                <div className="flex-1 h-2 bg-surface-raised rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full rounded-full transition-all ${
+                      result.portfolioDrawdown < 0 ? 'bg-accent-red' : 'bg-accent-green'
+                    }`}
+                    style={{ 
+                      width: `${Math.min(Math.abs(result.portfolioDrawdown), 100)}%`,
+                      marginLeft: result.portfolioDrawdown < 0 ? 'auto' : 0,
+                      marginRight: result.portfolioDrawdown < 0 ? 0 : 'auto',
+                      right: result.portfolioDrawdown < 0 ? 0 : 'auto',
+                      left: result.portfolioDrawdown >= 0 ? 0 : 'auto',
+                    }}
+                  />
+                </div>
               </div>
-              <div className="space-y-1">
-                {result.breakdown.slice(0, 5).map(item => (
-                  <div key={item.positionName} className="flex text-sm">
-                    <span className="text-text w-16 font-mono">{item.positionName}</span>
-                    <span className="text-text-muted w-12 text-right">{item.weight}%</span>
-                    <span className={`flex-1 text-right font-mono ${item.estimatedDrawdown < 0 ? 'text-accent-red' : 'text-accent-green'}`}>
-                      {item.estimatedDrawdown > 0 ? '+' : ''}{item.estimatedDrawdown}%
+              
+              <div className="space-y-1 pt-2 border-t border-white/10">
+                {result.breakdown.slice(0, 4).map(item => (
+                  <div key={item.positionName} className="flex items-center text-sm">
+                    <span className="text-secondary w-20 truncate">{item.positionName}</span>
+                    <span className="text-text-muted w-10 text-right">{item.weight}%</span>
+                    <span className={`flex-1 text-right font-mono ${
+                      item.estimatedDrawdown < 0 ? 'text-accent-red' : 'text-accent-green'
+                    }`}>
+                      {item.estimatedDrawdown >= 0 ? '+' : ''}{item.estimatedDrawdown}%
                     </span>
                   </div>
                 ))}
