@@ -163,7 +163,9 @@ export function Step3Analysis({ aggregated, stressResults, riskProfile, isLoadin
               <HorizontalBar label={t('analysis.currHedg')} value={aggregated.hasCurrencyHedging ? 100 : 0} color="#00D68F" />
               <div className="col-span-2 pt-2 border-t border-white/10">
                 <div className="text-text-secondary text-sm mb-1">{t('analysis.ter')}</div>
-                <div className="text-2xl gradient-text font-mono">{aggregated.weightedTER}%</div>
+                <div className="text-2xl gradient-text font-mono">
+                  {aggregated.weightedTER > 0 ? `${aggregated.weightedTER}%` : 'N/A'}
+                </div>
               </div>
             </div>
           </div>

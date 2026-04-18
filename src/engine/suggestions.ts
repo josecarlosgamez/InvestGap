@@ -59,7 +59,7 @@ export function generateSuggestions(
     no_real_assets: f => ['real_estate', 'commodity', 'gold'].includes(f.assetClass),
     no_defensive_layer: f => f.assetClass === 'fixed_income' && f.srri <= 3,
     currency_risk: f => f.currencyHedged,
-    high_ter: f => f.ter < 0.25,
+    high_ter: f => (f.ter ?? 1) < 0.25,
     srri_mismatch: f => f.assetClass === 'fixed_income' || f.isDiversified,
     no_gold_or_commodity: f => ['commodity', 'gold'].includes(f.assetClass),
     single_provider_risk: f => true,
@@ -75,7 +75,7 @@ export function generateSuggestions(
     const matches = compatible
       .filter(filter)
       .filter(f => !usedISINs.has(f.isin))
-      .sort((a, b) => a.ter - b.ter)
+      .sort((a, b) => (a.ter ?? 1) - (b.ter ?? 1))
       .slice(0, 2);
 
     for (const fund of matches) {

@@ -322,7 +322,7 @@ export function createFundFromYahoo(searchResult: YahooSearchResult): Partial<Fu
       : {},
     equityStyle: isEquity ? equityStyle : undefined,
     srri,
-    ter: 0.20,
+    ter: null,
     currency: 'USD',
     currencyHedged: false,
     isInflationProtected: false,

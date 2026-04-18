@@ -34,7 +34,9 @@ export function aggregatePortfolio(positions: PortfolioPosition[]): AggregatedPo
     assetBreakdown.cash += w * fund.assetBreakdown.cash;
 
     weightedSRRI += w * fund.srri;
-    weightedTER += w * fund.ter;
+    if (fund.ter !== null && fund.ter !== undefined) {
+      weightedTER += w * fund.ter;
+    }
 
     if (fund.isInflationProtected && pos.weight > 5) hasInflationProtection = true;
     if (fund.currencyHedged && pos.weight > 5) hasCurrencyHedging = true;

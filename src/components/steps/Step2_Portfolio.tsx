@@ -77,7 +77,7 @@ export function Step2Portfolio({ portfolio, onAddFund, onRemoveFund, onUpdateWei
       sectorExposure: partialFund.sectorExposure || {},
       equityStyle: partialFund.equityStyle,
       srri: partialFund.srri || 5,
-      ter: partialFund.ter || 0.20,
+      ter: partialFund.ter ?? null,
       currency: partialFund.currency || 'USD',
       currencyHedged: partialFund.currencyHedged || false,
       isInflationProtected: partialFund.isInflationProtected || false,
@@ -91,9 +91,9 @@ export function Step2Portfolio({ portfolio, onAddFund, onRemoveFund, onUpdateWei
     const yahooData = await fetchYahooFundData(fullFund);
     if (yahooData) {
       const enriched = mapYahooToFundData(yahooData);
-      fullFund.assetBreakdown = enriched.assetBreakdown || fullFund.assetBreakdown;
-      fullFund.sectorExposure = enriched.sectorExposure || fullFund.sectorExposure;
-      fullFund.ter = enriched.ter || fullFund.ter;
+      if (enriched.assetBreakdown) fullFund.assetBreakdown = enriched.assetBreakdown;
+      if (enriched.sectorExposure) fullFund.sectorExposure = enriched.sectorExposure;
+      if (enriched.ter !== undefined && enriched.ter !== null) fullFund.ter = enriched.ter;
     }
 
     setSelectedFund(fullFund);

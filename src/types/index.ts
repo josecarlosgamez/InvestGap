@@ -84,7 +84,7 @@ export interface Fund {
   creditQuality?: 'investment_grade' | 'high_yield' | 'mixed' | 'government';
   equityStyle?: EquityStyle;
   srri: 1 | 2 | 3 | 4 | 5 | 6 | 7;
-  ter: number;
+  ter: number | null;
   currency: string;
   currencyHedged: boolean;
   isInflationProtected: boolean;
