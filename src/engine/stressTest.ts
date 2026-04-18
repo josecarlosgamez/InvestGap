@@ -1,6 +1,6 @@
-import type { Fund, PortfolioPosition, CrisisScenario, StressTestResult, CrisisKey } from '../types';
+import type { Fund, PortfolioPosition, StressTestResult, CrisisKey } from '../types';
 import { CRISIS_SCENARIOS } from '../data/crises';
-import { PROXY_DATA, type ProxyKey, getProxyDrawdown } from '../data/proxies';
+import { type ProxyKey, getProxyDrawdown } from '../data/proxies';
 
 interface ProxyWeights {
   US_LARGE_CAP: number;
@@ -15,7 +15,7 @@ interface ProxyWeights {
   REAL_ESTATE: number;
 }
 
-function calculateProxyWeights(fund: Fund): ProxyWeights {
+export function calculateProxyCorrelations(fund: Fund): ProxyWeights {
   const weights: ProxyWeights = {
     US_LARGE_CAP: 0,
     US_TECH_GROWTH: 0,
@@ -29,151 +29,69 @@ function calculateProxyWeights(fund: Fund): ProxyWeights {
     REAL_ESTATE: 0,
   };
 
-  if (fund.assetClass === 'equity') {
+  const equityPct = fund.assetBreakdown.equity / 100;
+  const fixedIncomePct = fund.assetBreakdown.fixedIncome / 100;
+  const realEstatePct = fund.assetBreakdown.realEstate / 100;
+  const goldPct = fund.assetBreakdown.gold / 100;
+  const commodityPct = fund.assetBreakdown.commodity / 100;
+
+  if (equityPct > 0) {
     const geo = fund.geoExposure;
-    const totalGeo = Object.values(geo).reduce((sum, v) => sum + (v || 0), 0);
+    const totalGeo = (geo.us || 0) + (geo.europe || 0) + (geo.japan || 0) + (geo.emerging_markets || 0) + (geo.global || 0) + (geo.asia_pacific_ex_japan || 0) + (geo.spain || 0) + (geo.eurozone || 0);
     
-    const usWeight = (geo.us || 0) / totalGeo;
-    const europeWeight = (geo.europe || 0) / totalGeo;
-    const emWeight = (geo.emerging_markets || 0) / totalGeo;
-    const japanWeight = (geo.japan || 0) / totalGeo;
-
-    if (usWeight > 0) {
-      const techExposure = fund.sectorExposure.technology || 0;
-      if (techExposure > 40) {
-        weights.US_TECH_GROWTH += usWeight * 0.7;
-        weights.US_LARGE_CAP += usWeight * 0.3;
-      } else if (fund.equityStyle === 'small_cap') {
-        weights.US_LARGE_CAP += usWeight * 0.5;
-        weights.US_TECH_GROWTH += usWeight * 0.2;
-        weights.REAL_ESTATE += usWeight * 0.3;
-      } else {
-        weights.US_LARGE_CAP += usWeight;
-      }
-    }
-
-    if (europeWeight > 0) {
-      weights.EUROPE_EQUITY += europeWeight;
-    }
-
-    if (emWeight > 0) {
-      weights.EM_EQUITY += emWeight;
-    }
-
-    if (japanWeight > 0) {
-      weights.EUROPE_EQUITY += japanWeight * 0.3;
-      weights.US_LARGE_CAP += japanWeight * 0.3;
-      weights.COMMODITIES += japanWeight * 0.2;
-      weights.REAL_ESTATE += japanWeight * 0.2;
-    }
-
-    const remaining = 1 - (usWeight + europeWeight + emWeight + japanWeight);
-    if (remaining > 0) {
-      weights.GLOBAL_AGG_BOND += remaining * 0.5;
-      weights.REAL_ESTATE += remaining * 0.3;
-      weights.GOLD += remaining * 0.2;
-    }
-  }
-
-  if (fund.assetClass === 'fixed_income') {
-    const duration = fund.avgDurationYears || 5;
-    const bondType = fund.bondType;
-
-    if (duration < 3) {
-      weights.GLOBAL_AGG_BOND = 0.7;
-      weights.LONG_TREASURY = 0.1;
-      weights.HIGH_YIELD_BOND = 0.2;
-    } else if (duration > 10) {
-      weights.LONG_TREASURY = 0.6;
-      weights.GLOBAL_AGG_BOND = 0.3;
-      weights.HIGH_YIELD_BOND = 0.1;
+    if (totalGeo === 0) {
+      weights.US_LARGE_CAP += equityPct * 0.5;
+      weights.EUROPE_EQUITY += equityPct * 0.25;
+      weights.EM_EQUITY += equityPct * 0.25;
     } else {
-      weights.GLOBAL_AGG_BOND = 0.5;
-      weights.LONG_TREASURY = 0.3;
-      weights.HIGH_YIELD_BOND = 0.2;
-    }
+      const usGeoPct = (geo.us || 0) / totalGeo;
+      const europeGeoPct = (geo.europe || 0) / totalGeo;
+      const emGeoPct = (geo.emerging_markets || 0) / totalGeo;
+      const japanGeoPct = (geo.japan || 0) / totalGeo;
 
-    if (bondType === 'government') {
-      weights.LONG_TREASURY += 0.2;
-      weights.GLOBAL_AGG_BOND -= 0.2;
-    }
-    if (bondType === 'corporate_ig') {
-      weights.GLOBAL_AGG_BOND += 0.3;
-    }
-    if (bondType === 'corporate_hy') {
-      weights.HIGH_YIELD_BOND = 0.5;
-    }
-    if (bondType === 'inflation_linked') {
-      weights.GOLD += 0.2;
-    }
-    if (fund.creditQuality === 'high_yield') {
-      weights.HIGH_YIELD_BOND = 0.6;
+      const usWeight = usGeoPct + japanGeoPct * 0.5;
+      const europeWeight = europeGeoPct + japanGeoPct * 0.5;
+
+      const techPct = (fund.sectorExposure.technology || 0) / 100;
+      const usEquityAlloc = equityPct * usWeight;
+      const techShift = techPct * usEquityAlloc;
+      const usLargeCapRemainder = usEquityAlloc - techShift;
+
+      weights.US_TECH_GROWTH += techShift;
+      weights.US_LARGE_CAP += usLargeCapRemainder;
+      weights.EUROPE_EQUITY += equityPct * europeWeight;
+      weights.EM_EQUITY += equityPct * emGeoPct;
     }
   }
 
-  if (fund.assetClass === 'real_estate') {
-    weights.REAL_ESTATE = 0.7;
-    weights.GLOBAL_AGG_BOND = 0.2;
-    weights.GOLD = 0.1;
+  if (fixedIncomePct > 0) {
+    if (fund.bondType === 'corporate_hy') {
+      weights.HIGH_YIELD_BOND = fixedIncomePct;
+    } else if ((fund.avgDurationYears || 0) >= 10) {
+      weights.LONG_TREASURY = fixedIncomePct;
+    } else {
+      weights.GLOBAL_AGG_BOND = fixedIncomePct;
+    }
   }
 
-  if (fund.assetClass === 'commodity') {
-    weights.COMMODITIES = 0.8;
-    weights.GOLD = 0.1;
-    weights.REAL_ESTATE = 0.1;
-  }
+  weights.REAL_ESTATE += realEstatePct;
+  weights.GOLD += goldPct;
+  weights.COMMODITIES += commodityPct;
 
-  if (fund.assetClass === 'gold') {
-    weights.GOLD = 0.9;
-    weights.COMMODITIES = 0.1;
-  }
+  const cashPct = fund.assetBreakdown.cash / 100;
+  const totalRiskAssets = 1 - cashPct;
 
-  if (fund.assetClass === 'cash') {
-    weights.GLOBAL_AGG_BOND = 0.5;
-    weights.LONG_TREASURY = 0.5;
-  }
-
-  if (fund.assetClass === 'mixed') {
-    const equityWeight = fund.assetBreakdown.equity / 100;
-    const fixedWeight = fund.assetBreakdown.fixedIncome / 100;
-    const realEstateWeight = fund.assetBreakdown.realEstate / 100;
-    const commodityWeight = fund.assetBreakdown.commodity / 100;
-    const goldWeight = fund.assetBreakdown.gold / 100;
-
-    const equityProxies = calculateProxyWeights({
-      ...fund,
-      assetClass: 'equity',
-      assetBreakdown: { equity: 100, fixedIncome: 0, realEstate: 0, commodity: 0, gold: 0, cash: 0 },
-    });
-
-    const fixedProxies = calculateProxyWeights({
-      ...fund,
-      assetClass: 'fixed_income',
-      assetBreakdown: { equity: 0, fixedIncome: 100, realEstate: 0, commodity: 0, gold: 0, cash: 0 },
-    });
-
+  if (totalRiskAssets > 0 && totalRiskAssets < 1) {
     for (const key of Object.keys(weights) as ProxyKey[]) {
-      weights[key] = 
-        (equityProxies[key] || 0) * equityWeight +
-        (fixedProxies[key] || 0) * fixedWeight +
-        (key === 'REAL_ESTATE' ? realEstateWeight : 0) +
-        (key === 'COMMODITIES' ? commodityWeight : 0) +
-        (key === 'GOLD' ? goldWeight : 0);
-    }
-  }
-
-  const total = Object.values(weights).reduce((sum, v) => sum + v, 0);
-  if (total > 0) {
-    for (const key of Object.keys(weights) as ProxyKey[]) {
-      weights[key] = weights[key] / total;
+      weights[key] = weights[key] / totalRiskAssets;
     }
   }
 
   return weights;
 }
 
-function calculateFundDrawdown(fund: Fund, crisisKey: CrisisKey): number {
-  const proxies = calculateProxyWeights(fund);
+export function calculateFundDrawdown(fund: Fund, crisisKey: CrisisKey): number {
+  const proxies = calculateProxyCorrelations(fund);
   let totalDrawdown = 0;
 
   for (const [proxyKey, weight] of Object.entries(proxies)) {
