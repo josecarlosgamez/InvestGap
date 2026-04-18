@@ -179,10 +179,10 @@ export function Step2Portfolio({ portfolio, onAddFund, onRemoveFund, onUpdateWei
                     className="w-full text-left px-3 py-2 hover:bg-surface-raised rounded-lg transition-colors"
                   >
                     <div className="flex items-center justify-between">
-                      <span className="text-accent-secondary font-mono text-sm">{result.symbol}</span>
-                      <span className="text-xs text-text-muted bg-surface px-2 py-0.5 rounded">{result.type}</span>
+                      <span className="text-accent-secondary font-mono text-sm">{result.name}</span>
+                      <span className="text-xs text-text-muted bg-surface px-2 py-0.5 rounded">{result.symbol}</span>
                     </div>
-                    <div className="text-text-secondary text-xs truncate">{result.name}</div>
+                    <div className="text-text-muted text-xs truncate">{result.type} · {result.exchange}</div>
                   </button>
                 ))}
               </div>
