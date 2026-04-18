@@ -102,7 +102,13 @@ export async function searchYahooFunds(query: string): Promise<YahooSearchResult
     
     if (data?.quotes) {
       return data.quotes
-        .filter((q: any) => q.quoteType === 'ETF' || q.quoteType === 'MUTETF' || q.quoteType === 'MUT FUND' || q.quoteType === 'EQUITY')
+        .filter((q: any) => 
+          q.quoteType === 'ETF' || 
+          q.quoteType === 'MUTETF' || 
+          q.quoteType === 'MUT FUND' || 
+          q.quoteType === 'MUTUALFUND' ||
+          q.quoteType === 'EQUITY'
+        )
         .slice(0, 8)
         .map((q: any) => ({
           symbol: q.symbol,
@@ -126,20 +132,25 @@ function getAssetType(quoteType: string): string {
     case 'MUTETF':
       return 'etf';
     case 'MUT FUND':
+    case 'MUTUALFUND':
       return 'index_fund';
     case 'EQUITY':
       return 'stock';
     default:
-      return 'etf';
+      return 'index_fund';
   }
 }
 
 export async function fetchYahooFundData(fund: Fund): Promise<YahooFundData | null> {
-  const ticker = fund.yahooTicker || getYahooTicker(fund.shortName);
+  let ticker = fund.yahooTicker || getYahooTicker(fund.shortName);
   
   if (!ticker) {
     console.warn(`No Yahoo ticker found for ${fund.shortName}`);
     return null;
+  }
+
+  if (fund.shortName.startsWith('0P') && !ticker.includes('.')) {
+    ticker = ticker + '.F';
   }
 
   try {
