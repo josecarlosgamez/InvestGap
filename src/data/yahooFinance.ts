@@ -78,6 +78,62 @@ export function getYahooTicker(fundNameOrTicker: string): string | null {
   return null;
 }
 
+export interface YahooSearchResult {
+  symbol: string;
+  name: string;
+  type: string;
+  exchange: string;
+  assetType: string;
+}
+
+export async function searchYahooFunds(query: string): Promise<YahooSearchResult[]> {
+  if (!query || query.length < 1) return [];
+  
+  try {
+    const response = await fetch(
+      `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(query)}&quotesCount=10&newsCount=0&enableFuzzyQuery=false&quotesQueryId=00000000-00000000-00000000-00000000-00000000-00000000-00000000-00000000-00000000-00000000`
+    );
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    
+    if (data?.quotes) {
+      return data.quotes
+        .filter((q: any) => q.quoteType === 'ETF' || q.quoteType === 'MUTETF' || q.quoteType === 'MUT FUND' || q.quoteType === 'EQUITY')
+        .slice(0, 8)
+        .map((q: any) => ({
+          symbol: q.symbol,
+          name: q.shortname || q.longname || q.symbol,
+          type: q.quoteType,
+          exchange: q.exchange || '',
+          assetType: getAssetType(q.quoteType),
+        }));
+    }
+    
+    return [];
+  } catch (error) {
+    console.error('Yahoo search error:', error);
+    return [];
+  }
+}
+
+function getAssetType(quoteType: string): string {
+  switch (quoteType) {
+    case 'ETF':
+    case 'MUTETF':
+      return 'etf';
+    case 'MUT FUND':
+      return 'index_fund';
+    case 'EQUITY':
+      return 'stock';
+    default:
+      return 'etf';
+  }
+}
+
 export async function fetchYahooFundData(fund: Fund): Promise<YahooFundData | null> {
   const ticker = fund.yahooTicker || getYahooTicker(fund.shortName);
   
@@ -189,4 +245,61 @@ export function calculateSRRIFromBeta(beta: number, stdDev: number): 1 | 2 | 3 |
   if (beta <= 1.2 && stdDev <= 16) return 5;
   if (beta <= 1.4 && stdDev <= 20) return 6;
   return 7;
+}
+
+export function createFundFromYahoo(searchResult: YahooSearchResult): Partial<Fund> {
+  const isEquity = searchResult.assetType === 'stock' || searchResult.type === 'EQUITY';
+  const isEtf = searchResult.assetType === 'etf';
+  
+  let equityStyle: 'growth' | 'value' | 'blend' | 'dividend' | 'small_cap' = 'blend';
+  if (searchResult.symbol.includes('GROWTH') || searchResult.symbol.includes('AGG')) {
+    equityStyle = 'growth';
+  } else if (searchResult.symbol.includes('VALUE') || searchResult.symbol.includes('VL')) {
+    equityStyle = 'value';
+  } else if (searchResult.symbol.includes('DIV') || searchResult.symbol.includes('DY')) {
+    equityStyle = 'dividend';
+  } else if (searchResult.symbol.includes('SMALL') || searchResult.symbol.includes('SC')) {
+    equityStyle = 'small_cap';
+  }
+  
+  let srri: 1 | 2 | 3 | 4 | 5 | 6 | 7 = 5;
+  if (isEtf) {
+    if (searchResult.symbol.includes('AGG') || searchResult.symbol.includes('BOND')) {
+      srri = 2;
+    } else if (searchResult.symbol.includes('SMALL') || searchResult.symbol.includes('EM')) {
+      srri = 6;
+    } else if (searchResult.symbol.includes('TECH') || searchResult.symbol.includes('GROWTH')) {
+      srri = 6;
+    } else {
+      srri = 5;
+    }
+  }
+  
+  return {
+    isin: `YAH-${searchResult.symbol}`,
+    name: searchResult.name,
+    shortName: searchResult.symbol,
+    provider: searchResult.exchange || 'Yahoo Finance',
+    fundType: searchResult.assetType as 'etf' | 'index_fund' | 'active_fund',
+    vehicleNote: `ETF/Fondo de Yahoo Finance — ${searchResult.type}`,
+    yahooTicker: searchResult.symbol,
+    assetClass: isEquity ? 'equity' : 'fixed_income',
+    assetBreakdown: isEquity 
+      ? { equity: 100, fixedIncome: 0, realEstate: 0, commodity: 0, gold: 0, cash: 0 }
+      : { equity: 0, fixedIncome: 100, realEstate: 0, commodity: 0, gold: 0, cash: 0 },
+    geoExposure: { global: 100 },
+    sectorExposure: isEquity 
+      ? { technology: 20, financials: 15, healthcare: 12, consumer_discretionary: 11, industrials: 10, consumer_staples: 7, energy: 5, communication: 8, materials: 4, utilities: 3, real_estate: 2 }
+      : {},
+    equityStyle: isEquity ? equityStyle : undefined,
+    srri,
+    ter: 0.20,
+    currency: 'USD',
+    currencyHedged: false,
+    isInflationProtected: false,
+    isDiversified: true,
+    minRiskProfile: 'moderate',
+    maxRiskProfile: 'aggressive',
+    tags: ['yahoo', searchResult.assetType, searchResult.type.toLowerCase()],
+  };
 }
