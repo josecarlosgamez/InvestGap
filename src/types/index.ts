@@ -67,6 +67,7 @@ export interface Fund {
   provider: string;
   fundType: FundType;
   vehicleNote: string;
+  yahooTicker?: string;
   assetClass: AssetClass;
   assetBreakdown: {
     equity: number;

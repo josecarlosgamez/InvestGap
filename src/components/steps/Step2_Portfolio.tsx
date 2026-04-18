@@ -22,11 +22,13 @@ export function Step2Portfolio({ portfolio, onAddFund, onRemoveFund, onUpdateWei
 
   const filteredFunds = useMemo(() => {
     if (search.length < 2) return [];
+    const searchLower = search.toLowerCase();
     return FUND_DATABASE.filter(f => 
-      f.name.toLowerCase().includes(search.toLowerCase()) ||
-      f.shortName.toLowerCase().includes(search.toLowerCase()) ||
-      f.isin.toLowerCase().includes(search.toLowerCase())
-    ).slice(0, 8);
+      f.name.toLowerCase().includes(searchLower) ||
+      f.shortName.toLowerCase().includes(searchLower) ||
+      f.provider.toLowerCase().includes(searchLower) ||
+      f.isin.toLowerCase().includes(searchLower)
+    ).slice(0, 10);
   }, [search]);
 
   const handleSelectFund = (fund: Fund) => {
